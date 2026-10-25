@@ -1,0 +1,77 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Two Disks – Angular Momentum Conservation</title>
+<style>
+:root{--bg:#fff;--fg:#1a1a1a;--mut:#666;--card:#f3f4f6;--d1:#3b82f6;--d2:#f59e0b;--ln:#d1d5db;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15171c;--fg:#eceef2;--mut:#9aa0ab;--card:#222630;--d1:#60a5fa;--d2:#fbbf24;--ln:#3a3f4b}}
+:root[data-theme="dark"]{--bg:#15171c;--fg:#eceef2;--mut:#9aa0ab;--card:#222630;--d1:#60a5fa;--d2:#fbbf24;--ln:#3a3f4b}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;padding:16px;max-width:760px;margin:auto}
+h1{font-size:19px;margin:0 0 4px}p.s{color:var(--mut);margin:0 0 12px}
+canvas{width:100%;max-width:700px;display:block;margin:auto;background:var(--card);border-radius:12px;border:3px solid #2b8be0}
+.row{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0}button{background:var(--d1);color:#fff;border:0;border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer}button.g{background:var(--card);color:var(--fg);border:1px solid var(--ln)}
+.ctl{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:13px;color:var(--mut);display:block}input[type=range]{width:100%}
+.res{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px}.res div{background:var(--card);border-radius:10px;padding:8px 10px;font-size:13px;color:var(--mut)}.res b{display:block;font-size:17px;color:var(--fg)}
+#ph{text-align:center;color:var(--mut);margin-top:6px;min-height:20px}
+</style></head><body>
+<h1>Two disks: conservation of angular momentum</h1>
+<p class="s">Disk 1 spins freely. Disk 2 (same mass, R₂ = R₁/2) is dropped on it; friction brings them to a common ω<sub>f</sub>.</p>
+<canvas id="c" width="660" height="340"></canvas><div id="ph"></div>
+<div class="row"><button id="go">▶ Drop disk 2</button><button class="g" id="rs">Reset</button></div>
+<div class="ctl">
+<label>I₁ = <span id="v1">0.50</span> kg·m²<input id="I1" type="range" min="0.1" max="1" step="0.05" value="0.5"></label>
+<label>ω<sub>i</sub> = <span id="v2">2.0</span> rad/s<input id="wi" type="range" min="0.5" max="5" step="0.1" value="2"></label>
+<label>R₂/R₁ = <span id="v3">0.50</span><input id="rr" type="range" min="0.2" max="1" step="0.05" value="0.5"></label>
+<label>Speed ×<span id="v4">1</span><input id="sp" type="range" min="0.25" max="2" step="0.25" value="1"></label></div>
+<div class="res">
+<div>I₂ = ½M R₂² = I₁(R₂/R₁)²<b id="rI2"></b></div><div>ω now (disk 1 | disk 2)<b id="rw"></b></div>
+<div>ω<sub>f</sub> = I₁ω<sub>i</sub>/(I₁+I₂)<b id="rf"></b></div><div>L (before → now)<b id="rL"></b></div>
+<div>KE (before → now)<b id="rK"></b></div><div>Energy lost to friction<b id="rE"></b></div></div>
+<script>
+const $=id=>document.getElementById(id),cv=$('c'),g=cv.getContext('2d'),CS=()=>getComputedStyle(document.documentElement);
+let st,a1,a2,t;
+function P(){const I1=+$('I1').value,wi=+$('wi').value,r=+$('rr').value,I2=I1*r*r,wf=I1*wi/(I1+I2);return{I1,wi,r,I2,wf}}
+function reset(){st=0;t=0;a1=0;a2=0;$('go').disabled=false;upd()}
+function upd(){const p=P();setS();$('v1').textContent=p.I1.toFixed(2);$('v2').textContent=p.wi.toFixed(1);$('v3').textContent=p.r.toFixed(2);$('v4').textContent=$('sp').value;
+$('rI2').textContent=p.I2.toFixed(4)+' kg·m²';$('rf').textContent=p.wf.toFixed(3)+' rad/s';$('rE').textContent=(.5*p.I1*p.wi**2-.5*(p.I1+p.I2)*p.wf**2).toFixed(3)+' J'}
+const D=.25;let S=2;function setS(){const p=P();S=Math.max(.05,(140*Math.PI/180-p.wi*D)/((p.wi+p.wf)/2));if(st==0)a2=p.wi*D+p.wi*S/2}
+function w(){const p=P();if(st==0)return[0,0];if(st==1)return[p.wi,0];if(st==2){const k=Math.min(t/S,1);return[p.wi-(p.wi-p.wf)*k,p.wf*k]}return[p.wf,p.wf]}
+let last=performance.now(),aL=0,aSl=0;
+function tick(n){const dt=Math.min((n-last)/1000,.05)*$('sp').value;last=n;const p=P();
+if(st==1){t+=dt;if(t>=D){st=2;t=0}}else if(st==2){t+=dt;if(t>=S){st=3}}
+const[w1,w2]=w();a1+=w1*dt;a2+=w2*dt;aL+=p.wi*dt;
+draw(p,w1,w2);requestAnimationFrame(tick)}
+const H=11,RY=.3,TOP=14;
+function ell(x,y,rx,ry){g.beginPath();g.ellipse(x,y,rx,ry,0,0,7)}
+function axle(x,y0,y1){g.fillStyle='#9aa0a6';g.fillRect(x-10,y0,20,y1-y0);g.fillStyle='rgba(255,255,255,.35)';g.fillRect(x-6,y0,5,y1-y0)}
+function disk(x,y,R,a,mk){const ry=R*RY;
+g.fillStyle='#f6b97a';g.strokeStyle='#e2761b';g.lineWidth=2.5;
+ell(x,y+H,R,ry);g.fill();g.stroke();g.fillRect(x-R,y,2*R,H);
+g.beginPath();g.moveTo(x-R,y);g.lineTo(x-R,y+H);g.moveTo(x+R,y);g.lineTo(x+R,y+H);g.stroke();
+g.fillStyle='#fcd9b0';ell(x,y,R,ry);g.fill();g.stroke();
+const px=x+(R-8)*Math.cos(a),py=y+(R-8)*RY*Math.sin(a);
+g.strokeStyle=mk;g.lineWidth=3;g.beginPath();g.moveTo(x,y);g.lineTo(px,py);g.stroke();g.beginPath();g.arc(px,py,4.5,0,7);g.fillStyle=mk;g.fill()}
+function scene(x,y1,R1,R2,aa1,aa2,y2,showAxleOver){
+axle(x,TOP,310);
+disk(x,y1,R1,aa1,'#b91c1c');
+g.save();g.fillStyle='#9aa0a6';axle(x,TOP,y1);g.restore();
+if(R2){disk(x,y2,R2,aa2,'#1d4ed8');axle(x,TOP,y2)}}
+function txt(s,x,y,col,sz,b){g.fillStyle=col;g.font=(b?'bold ':'')+sz+'px system-ui,sans-serif';g.textAlign='center';g.fillText(s,x,y)}
+function draw(p,w1,w2){const c=CS(),fg=c.getPropertyValue('--fg'),R1=112,R2=R1*p.r,Y1=240;
+g.clearRect(0,0,660,340);
+// BEFORE
+scene(165,Y1,R1,R2,aL,0,120,1);
+txt('At rest',255,98,'#dc2626',15,1);txt('I\u2082',70,118,'#1e3a8a',20,1);txt('I\u2081',50,Y1+8,'#1e3a8a',20,1);
+txt("\u03B8\u2032\u1d62",40,Y1+34,fg,17,1);txt('Before',165,334,'#2b8be0',17,1);
+// AFTER (live)
+let y2=120;if(st==1){const k=t/D;y2=120+(Y1-H-120)*k*k}else if(st>=2)y2=Y1-H;
+scene(495,Y1,R1,R2,a1,a2,y2);
+if(st==0)aSl=0;else if(st<3)aSl=a1;
+txt('lower disk turned: '+(aSl*180/Math.PI).toFixed(0)+'\u00B0',495,40,'#b91c1c',15,1);
+txt("\u03B8\u2032f",610,Y1+34,fg,17,1);txt('After',495,334,'#2b8be0',17,1);
+const L=p.I1*w1+p.I2*w2,K=.5*p.I1*w1**2+.5*p.I2*w2**2;
+$('ph').textContent=['Press "Drop disk 2" to start','Disk 2 slides down the axle…','Slipping: friction transfers angular momentum','Locked together: \u03B8\u2032 = \u03B8\u2032f'][st];
+$('rw').textContent=w1.toFixed(2)+' | '+w2.toFixed(2)+' rad/s';
+$('rL').textContent=(p.I1*p.wi).toFixed(3)+' \u2192 '+L.toFixed(3);
+$('rK').textContent=(.5*p.I1*p.wi**2).toFixed(3)+' \u2192 '+K.toFixed(3)+' J'}
+$('go').onclick=()=>{if(st==0){st=1;t=0;$('go').disabled=true}};$('rs').onclick=reset;
+['I1','wi','rr','sp'].forEach(i=>$(i).oninput=()=>{if(i!='sp'&&st)reset();upd()});
+reset();requestAnimationFrame(tick);
+</script></body></html>
